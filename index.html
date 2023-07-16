@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OpenAI GPT-4 App</title>
+  <style>
+    /* Add your CSS here */
+  </style>
+</head>
+<body>
+  <input type="text" id="prompt" placeholder="Enter your prompt">
+  <button id="generate">Generate Text</button>
+  <button id="toggleAudio">Toggle Audio</button>
+  <p id="output"></p>
+
+  <script>
+    const generateButton = document.getElementById('generate');
+    const toggleAudioButton = document.getElementById('toggleAudio');
+    const outputElement = document.getElementById('output');
+    let audioEnabled = false;
+    let isListeningForCommand = false;
+
+    // Initialize SpeechRecognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.interimResults = true;
+
+    recognition.addEventListener('result', async (event) => {
+      const transcript = Array.from(event.results)
+        .map(result => result[0])
+        .map(result => result.transcript)
+        .join('');
+
+      // If we're listening for the wake word
+      if (!isListeningForCommand) {
+        if (transcript.includes('hey jarvis')) {
+          isListeningForCommand = true;
+        }
+      } else if (event.results[0].isFinal) {
+        const prompt = transcript;
+
+        const response = await fetch('/api/generate-text', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt }),
+        });
+
+        const data = await response.json();
+
+        outputElement.textContent = data.text;
+
+        if (audioEnabled) {
+          const utterance = new SpeechSynthesisUtterance(data.text);
+          window.speechSynthesis.speak(utterance);
+        }
+
+        isListeningForCommand = false;
+      }
+    });
+
+    recognition.addEventListener('end', recognition.start);
+
+    generateButton.addEventListener('click', () => {
+      recognition.start();
+    });
+
+    toggleAudioButton.addEventListener('click', () => {
+      audioEnabled = !audioEnabled;
+    });
+
+    recognition.start();
+  </script>
+</body>
+</html>
